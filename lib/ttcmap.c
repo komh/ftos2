@@ -4,7 +4,7 @@
  *
  *    TrueType Character Mappings
  *
- *  Copyright 1996-1999 by
+ *  Copyright 1996-1998 by
  *  David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  *  This file is part of the FreeType project, and may only be used
@@ -98,6 +98,7 @@
         if ( num_SH < u )
           num_SH = u;
       }
+      num_SH++;
 
       FORGET_Frame();
 
@@ -107,20 +108,20 @@
         ( ( cmap->length - 2L * (256 + 3) - num_SH * 8L ) & 0xffff) / 2;
 
       if ( ALLOC_ARRAY( cmap2->subHeaders,
-                        num_SH + 1,
+                        num_SH,
                         TCMap2SubHeader )     ||
-           ACCESS_Frame( ( num_SH + 1 ) * 8L ) )
+           ACCESS_Frame( ( num_SH ) * 8L ) )
         goto Fail;
 
       cmap2sub = cmap2->subHeaders;
 
-      for ( i = 0; i <= num_SH; i++ )
+      for ( i = 0; i < num_SH; i++ )
       {
         cmap2sub->firstCode     = GET_UShort();
         cmap2sub->entryCount    = GET_UShort();
         cmap2sub->idDelta       = GET_Short();
         /* we apply the location offset immediately */
-        cmap2sub->idRangeOffset = GET_UShort() - ( num_SH - i ) * 8 - 2;
+        cmap2sub->idRangeOffset = GET_UShort() - ( num_SH - 1 - i ) * 8 - 2;
 
         cmap2sub++;
       }
@@ -374,11 +375,27 @@
 
     index1 = cmap2->subHeaderKeys[charCode <= 0xFF ?
                                   charCode : (charCode >> 8)];
-
     if ( index1 == 0 )
     {
-      if ( charCode <= 0xFF )
-        return cmap2->glyphIdArray[charCode];   /* 8bit character code */
+      if ( charCode > 0xFF )
+        return 0;
+
+      sh2 = cmap2->subHeaders[index1];
+
+      if ( (charCode & 0xFF) < sh2.firstCode )
+        return 0;
+
+      if ( (charCode & 0xFF) >= (sh2.firstCode + sh2.entryCount) )
+        return 0;
+
+      offset = sh2.idRangeOffset / 2 + (charCode & 0xFF) - sh2.firstCode;
+      if ( offset < cmap2->numGlyphId )
+        idx = cmap2->glyphIdArray[offset];
+      else
+        return 0;
+
+      if ( idx )
+        return (idx + sh2.idDelta) & 0xFFFF;
       else
         return 0;
     }

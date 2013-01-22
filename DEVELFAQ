@@ -16,7 +16,8 @@ A1: Yes! But if you think you have all you need, you're probably wrong :-)
 Q2: What compilers are supported?
 
 A2: The development of FreeType/2 was done primarily in IBM's VisualAge C++
-   version 3.0.8. 
+   version 3.0. It should be possible to build the DLL with Watcom C/C++ but
+   it's not quite working yet.
     It is perhaps possible to build the Font Driver with another compiler,
    but you'll have to know the compiler (and OS/2 of course) _quite_ well.
 

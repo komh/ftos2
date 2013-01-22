@@ -1,7 +1,7 @@
 
                         * * *   FreeType/2   * * *
 
-                      (Version 1.2.1, 26. February 2007)
+                      (Version 1.2.2, 28. May 2007)
 
  Copyright (C) 2002--2007 KO Myung-Hun <komh@chollian.net>
  Copyright (C) 2003--2004 Seo, Hyun-Tae <acrab001@hitel.net>
@@ -131,6 +131,21 @@ A8: First, you should modify a country code of CONFIG.SYS to your country code.
   - fakebold.cmd   Script to set the flag of using fake bold for DBCS
   - unienc.cmd     Script to set the flag of unicode encoding
   - ftos2src.zip   Source files
+
+- History
+
+  - v1.2.2 ( 2007/05/28 )
+    .Left bearing of SBit font don't work correctly. Fixed.
+    .Consider the font whose name is not compatible with primary codepage as 
+    'Wrong Name' one. Changed to use its first name.
+    .dfhsg-w5.ttf, dfhsm-w3.ttf are not recognized. Fixed.
+    
+  - v1.2.1 ( 2007/02/26 )
+    .Choose encoding type of unicode fonts instead of registering another font 
+     name preceded by '&' for unicode encoding.
+    
+  - v1.2.0 ( 2005/02/28 )
+    .Initial release merged with sources of Michal Necasek
 
 And finally, thanks go to:
  - the FreeType team, the makers of FreeType. Without them, my work would be

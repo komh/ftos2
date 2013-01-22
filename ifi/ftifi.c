@@ -9,7 +9,7 @@
 /*       Copyright (C) 1997, 1998 David Turner <dturner@cybercable.fr>     */
 /*       Copyright (C) 1997, 1999 International Business Machines          */
 /*                                                                         */
-/*       Version: 1.2.1                                                    */
+/*       Version: 1.2.2                                                    */
 /*                                                                         */
 /* This source is to be compiled with IBM VisualAge C++ 3.0.               */
 /* Other compilers may actually work too but don't forget this is NOT a    */
@@ -739,6 +739,9 @@ static  int  Wake_FontFile( PFontFile  cur_file )
 
   /*  now get suitable charmap for this font */
   encoding = GetCharmap(face);
+  COPY( "encoding = " ); CATI( encoding >> 16 ); CAT( " " ); CATI( encoding & 0xFFFF );
+  CAT(  "\n" ); WRITE;
+
   error = TT_Get_CharMap(face, encoding & 0xFFFF, &cmap);
   if (error)
   {
@@ -816,6 +819,9 @@ static  int  Wake_FontFile( PFontFile  cur_file )
         ERET1(Fail_Face);
 
      encoding = GetCharmap(face);
+     COPY( "encoding = " ); CATI( encoding >> 16 ); CAT( " " ); CATI( encoding & 0xFFFF );
+     CAT(  "\n" ); WRITE;
+
      error = TT_Get_CharMap(face, encoding & 0xFFFF, &cmap);
      if (error)
         ERET1(Fail_Glyph);
@@ -1494,7 +1500,7 @@ static  int PM2TT( TT_CharMap  charMap,
             return 0;
 #endif
 
-#if 1
+#if 0
          if( index > 31 )
          {
             rc = TT_Char_Index( charMap, index );
@@ -1521,13 +1527,14 @@ static  int PM2TT( TT_CharMap  charMap,
                            &num_subs);
 
          COPY("UGL translation : PM2TT mode = "); CATI( mode ); CAT(" index = "); CATI( index );
-         CAT(" rc = "); CATI( rc ); CAT( " result = "); CATI( TT_Char_Index( charMap, ((unsigned short*)uni_buffer)[0]));
+         CAT(" unicode = "); CATI( uni_buffer[ 0 ]); CAT(" rc = "); CATI( rc );
+         CAT( " result = "); CATI( TT_Char_Index( charMap, uni_buffer[ 0 ]));
          CAT("\r\n"); WRITE;
 
          if (rc != ULS_SUCCESS)
             return 0;
          else
-            return TT_Char_Index(charMap, ((unsigned short*)uni_buffer)[0]);
+            return TT_Char_Index(charMap, uni_buffer[0]);
 
       case TRANSLATE_SYMBOL:
       case TRANSLATE_UNICODE:
@@ -1623,13 +1630,14 @@ static  int PM2TT( TT_CharMap  charMap,
                                &num_subs);
 
             COPY("translation : PM2TT mode = "); CATI( mode ); CAT(" index = "); CATI( index );
-            CAT(" rc = "); CATI( rc ); CAT( " result = "); CATI( TT_Char_Index( charMap, ((unsigned short*)uni_buffer)[0]));
+            CAT(" unicode = "); CATI( uni_buffer[ 0 ]); CAT(" rc = "); CATI( rc );
+            CAT( " result = "); CATI( TT_Char_Index( charMap, uni_buffer[0]));
             CAT("\r\n"); WRITE;
 
             if (rc != ULS_SUCCESS)
                 return 0;
 
-            rc = TT_Char_Index( charMap, ((unsigned short*)uni_buffer)[0]);
+            rc = TT_Char_Index( charMap, uni_buffer[0]);
             if(( rc == 0 ) && ( mode == TRANSLATE_UNI_WANSUNG ) && kr_IsHanja( index ))
             {
                 COPY("Convert Hanja to Hangul\r\n"); WRITE;
@@ -2058,11 +2066,6 @@ LONG _System QueryFaces( HFF          hff,
          LONG  specEnc = PSEID_UNICODE;
          BOOL  UDCflag = FALSE;   /* !!!!TODO: UDC support */
 
-#if 0
-         iLangId = TT_MS_LANGID_CHINESE_TAIWAN;
-         iLangId = TT_MS_LANGID_CHINESE_PRC;
-#endif
-
          if(( iLangId == TT_MS_LANGID_KOREAN_EXTENDED_WANSUNG_KOREA ) &&
             ( TT_Char_Index( pface->charMap, 0xAC00 ) != 0 ))
             specEnc = PSEID_WANSUNG;
@@ -2140,6 +2143,11 @@ LONG _System QueryFaces( HFF          hff,
          default :
              strcpy(ifi.szGlyphlistName, "PMUGL");
       }
+
+      COPY("szGlyphlistName = "); CAT( ifi.szGlyphlistName );
+      CAT( " charMode = "); CATI( pface->charMode );
+      CAT( " num_Glyphs = "); CATI( properties.num_Glyphs ); CAT("\n");
+      WRITE;
 
       ifi.idRegistry         = 0;
       ifi.lCapEmHeight       = phead->Units_Per_EM; /* ??? probably correct  */
@@ -2322,11 +2330,7 @@ LONG _System QueryFaces( HFF          hff,
              pifi3->usWeightClass = 7;
 #if 1
              if( ifi.fsType & IFIMETRICS_FIXED )
-             {
-                TT_Pos addedwidth = getFakeBoldMetrics( ifi.lAveCharWidth, ifi.lMaxBaselineExt, NULL );
-                //pifi3->lAveCharWidth = ( ifi.lAveCharWidth + addedwidth + 63 ) & -64;
-                pifi3->lAveCharWidth += addedwidth;
-             }
+                pifi3->lAveCharWidth += getFakeBoldMetrics( 0, pifi3->lMaxBaselineExt, NULL );
 #endif
              ifiCount += cMetricLen;
           }
@@ -2784,13 +2788,16 @@ LONG _System QueryFaceAttr( HFC     hfc,
             }
          }
 
+      #if 1
          if ( fUseFakeBold && size->fakebold)
          {
-            TT_Pos addwid = getFakeBoldMetrics( wid, heights[0], NULL);
+            TT_Pos addwid;
 
+            addwid = getFakeBoldMetrics( 0, heights[ 0 ], NULL );
             adv_widths[ 0 ] += addwid;
             wid += addwid;
          }
+      #endif
 
          if (size->vertical && !is_HALFCHAR(i))
          {
@@ -2810,11 +2817,7 @@ LONG _System QueryFaceAttr( HFC     hfc,
          }
          else
          {
-#if 1
-           pt->lA = 0;   // workaround for a SBIT font clipping problem.
-#else
            pt->lA = lefts[ 0 ];
-#endif
            pt->ulB = wid;
            pt->lC = adv_widths[0] - pt->lA - pt->ulB;
          }
@@ -2953,8 +2956,8 @@ LONG _System QueryCharAttr( HFC             hfc,
       COPY("  image.metrics.bbox.xMin = "); CATI (image.metrics.bbox.xMin);
       CAT( "  image.metrics.bbox.xMax = "); CATI (image.metrics.bbox.xMax); CAT("\n");
       CAT( "  image.metrics.bbox.yMin = "); CATI (image.metrics.bbox.yMin);
-      CAT( "  image.metrics.bbox.yMax = "); CATI (image.metrics.bbox.yMax);
-      CAT( "\n"); WRITE;
+      CAT( "  image.metrics.bbox.yMax = "); CATI (image.metrics.bbox.yMax); CAT( "\n");
+      WRITE;
    }
 
    sbitok = !sbiterror && !( size->vertical && !is_HALFCHAR(pCharAttr->gi)) && !size->transformed;
@@ -3043,9 +3046,15 @@ LONG _System QueryCharAttr( HFC             hfc,
       /* metrics values are in 26.6 format ! */
 
       if ( sbitok ) {
+         short lefts[ 2 ];
+
          ExtentX = image.metrics.bbox.xMax - image.metrics.bbox.xMin;
          ExtentY = image.metrics.bbox.yMax - image.metrics.bbox.yMin;
-         pbmm->pfxOrigin.x   = image.metrics.bbox.xMin << 10;
+
+         TT_Get_Face_Metrics( face->face, gindex, gindex,
+                              lefts, NULL, NULL, NULL );
+
+         pbmm->pfxOrigin.x   = lefts[ 0 ] * size->scaleFactor;
          pbmm->pfxOrigin.y   = image.metrics.bbox.yMax << 10;
       } else {
          ExtentX = bbox.xMax - bbox.xMin;
@@ -3126,7 +3135,7 @@ LONG _System QueryCharAttr( HFC             hfc,
          CAT( "  bitmap.size = " );  CATI( bitmap.size );
          CAT( "\n" ); WRITE;
 
-     COPY( "  Glyph bitmap loaded successfully!!\n" ); WRITE;
+         COPY( "  Glyph bitmap loaded successfully!!\n" ); WRITE;
 
             width = bitmap.width;
             rows  = bitmap.rows;
@@ -3562,6 +3571,130 @@ static void RemoveLastDBCSLead( char *str )
     }
 }
 
+#ifdef USE_UCONV
+/****************************************************************************/
+/*                                                                          */
+/* GetDBCSName :                                                            */
+/*                                                                          */
+/*   Get an appropriate DBCS name                                           */
+/*                                                                          */
+static char *GetUniDBCSName( USHORT language, LONG ulCp, char *string, USHORT string_len )
+{
+    static char name_buffer[FACESIZE + 2];
+
+    static UniChar     *cpNameWansung = L"IBM-949";
+    static UniChar     *cpNameBig5 = L"IBM-950";
+    static UniChar     *cpNameSJIS = L"IBM-943";
+    static UniChar     *cpNameGB2312 = L"IBM-1381";
+
+    UconvObject uconvObject = NULL;
+    UniChar     *cpName = NULL;
+    ULONG       uconvType;
+
+    switch( language )
+    {
+        case TT_MS_LANGID_KOREAN_EXTENDED_WANSUNG_KOREA :
+            if( !ulCp || ulCp == 949 )
+            {
+                cpName = cpNameWansung;
+                uconvType = UCONV_TYPE_WANSUNG;
+            }
+            break;
+
+        case TT_MS_LANGID_JAPANESE_JAPAN :
+            if( !ulCp || ulCp == 943 )
+            {
+                cpName = cpNameSJIS;
+                uconvType = UCONV_TYPE_SJIS;
+            }
+            break;
+
+        case TT_MS_LANGID_CHINESE_TAIWAN :
+        case TT_MS_LANGID_CHINESE_HONG_KONG :
+            if( !ulCp || ulCp == 950 )
+            {
+                cpName = cpNameBig5;
+                uconvType = UCONV_TYPE_BIG5;
+            }
+            break;
+
+        case TT_MS_LANGID_CHINESE_PRC :
+            if( !ulCp || ulCp == 1381 )
+            {
+                cpName = cpNameGB2312;
+                uconvType = UCONV_TYPE_GB2312;
+            }
+            break;
+
+        case TT_MS_LANGID_ENGLISH_UNITED_STATES :
+            if( !IsDBCSNameStr( string, string_len ))
+                break;
+
+            switch( iLangId )
+            {
+                case TT_MS_LANGID_KOREAN_EXTENDED_WANSUNG_KOREA :
+                    if( !ulCp || ulCp == 949 )
+                    {
+                        cpName = cpNameWansung;
+                        uconvType = UCONV_TYPE_WANSUNG;
+                    }
+                    break;
+
+                case TT_MS_LANGID_JAPANESE_JAPAN :
+                    if( !ulCp || ulCp == 943 )
+                    {
+                        cpName = cpNameSJIS;
+                        uconvType = UCONV_TYPE_SJIS;
+                    }
+                    break;
+
+                case TT_MS_LANGID_CHINESE_TAIWAN :
+                case TT_MS_LANGID_CHINESE_HONG_KONG :
+                    if( !ulCp || ulCp == 950 )
+                    {
+                        cpName = cpNameBig5;
+                        uconvType = UCONV_TYPE_BIG5;
+                    }
+                    break;
+
+                case TT_MS_LANGID_CHINESE_PRC :
+                    if( !ulCp || ulCp == 1381 )
+                    {
+                        cpName = cpNameGB2312;
+                        uconvType = UCONV_TYPE_GB2312;
+                    }
+                    break;
+            }
+            break;
+    }
+
+    if( cpName )
+    {
+        if( getUconvObject( cpName, &uconvObject, uconvType ) == 0 )
+        {
+            char uniName[( FACESIZE + 1 ) * 2 ] = { 0, };
+            int len;
+            int j;
+            ULONG rc;
+
+            len = min( FACESIZE * 2, string_len );
+
+            for( j = 0; j * 2 < len; j++ )
+            {
+                uniName[ j * 2 ] = string[ j * 2 + 1 ];
+                uniName[ j * 2 + 1 ] = string[ j * 2 ];
+            }
+
+            rc = UniStrFromUcs( uconvObject, name_buffer, ( UniChar * )uniName, sizeof( name_buffer ));
+            if( rc == ULS_SUCCESS )
+                return name_buffer;
+        }
+    }
+
+    return NULL;
+}
+#endif
+
 /****************************************************************************/
 /*                                                                          */
 /* LookupName :                                                             */
@@ -3572,24 +3705,12 @@ static  char*  LookupName(TT_Face face,  int index )
 {
    static char name_buffer[FACESIZE + 2];
    int    name_len = 0;
+
    int i, j, n;
 
    USHORT platform, encoding, language, id;
    char*  string;
    USHORT string_len;
-
-#ifdef USE_UCONV
-   static UconvObject uconvObject = NULL;
-   static UniChar     *cpName = NULL;
-   static UniChar     *cpNameWansung = L"IBM-949";
-   static UniChar     *cpNameBig5 = L"IBM-950";
-   static UniChar     *cpNameSJIS = L"IBM-943";
-   static UniChar     *cpNameGB2312 = L"IBM-1381";
-
-   ULONG uconvType;
-
-   int   rc;
-#endif
 
    int    found;
 
@@ -3598,6 +3719,7 @@ static  char*  LookupName(TT_Face face,  int index )
       return NULL;
 
 #ifdef USE_UCONV
+   // first, find a name for primary cp
    for ( i = 0; i < n; i++ )
    {
       TT_Get_Name_ID( face, i, &platform, &encoding, &language, &id );
@@ -3608,105 +3730,12 @@ static  char*  LookupName(TT_Face face,  int index )
          /* Try to find an appropriate name */
          if ( platform == TT_PLATFORM_MICROSOFT && encoding == TT_MS_ID_UNICODE_CS )
          {
-            cpName = NULL;
+            char *uniDBCSName;
 
-            switch( language )
-            {
-                case TT_MS_LANGID_KOREAN_EXTENDED_WANSUNG_KOREA :
-                    if( ulCp[ 1 ] == 949 )
-                    {
-                        cpName = cpNameWansung;
-                        uconvType = UCONV_TYPE_WANSUNG;
-                    }
-                    break;
+            uniDBCSName = GetUniDBCSName( language, ulCp[ 1 ], string, string_len );
 
-                case TT_MS_LANGID_JAPANESE_JAPAN :
-                    if( ulCp[ 1 ] == 943 )
-                    {
-                        cpName = cpNameSJIS;
-                        uconvType = UCONV_TYPE_SJIS;
-                    }
-                    break;
-
-                 case TT_MS_LANGID_CHINESE_TAIWAN :
-                 case TT_MS_LANGID_CHINESE_HONG_KONG :
-                    if( ulCp[ 1 ] == 950 )
-                    {
-                        cpName = cpNameBig5;
-                        uconvType = UCONV_TYPE_BIG5;
-                    }
-                    break;
-
-                case TT_MS_LANGID_CHINESE_PRC :
-                    if( ulCp[ 1 ] == 1381 )
-                    {
-                        cpName = cpNameGB2312;
-                        uconvType = UCONV_TYPE_GB2312;
-                    }
-                    break;
-
-                case TT_MS_LANGID_ENGLISH_UNITED_STATES :
-                    if( !IsDBCSNameStr( string, string_len ))
-                        break;
-
-                    switch( iLangId )
-                    {
-                        case TT_MS_LANGID_KOREAN_EXTENDED_WANSUNG_KOREA :
-                            if( ulCp[ 1 ] == 949 )
-                            {
-                                cpName = cpNameWansung;
-                                uconvType = UCONV_TYPE_WANSUNG;
-                            }
-                            break;
-
-                        case TT_MS_LANGID_JAPANESE_JAPAN :
-                            if( ulCp[ 1 ] == 943 )
-                            {
-                                cpName = cpNameSJIS;
-                                uconvType = UCONV_TYPE_SJIS;
-                            }
-                            break;
-
-                        case TT_MS_LANGID_CHINESE_TAIWAN :
-                        case TT_MS_LANGID_CHINESE_HONG_KONG :
-                            if( ulCp [ 1 ] == 950 )
-                            {
-                                cpName = cpNameBig5;
-                                uconvType = UCONV_TYPE_BIG5;
-                            }
-                            break;
-
-                        case TT_MS_LANGID_CHINESE_PRC :
-                            if( ulCp[ 1 ] == 1381 )
-                            {
-                                cpName = cpNameGB2312;
-                                uconvType = UCONV_TYPE_GB2312;
-                            }
-                            break;
-                    }
-            }
-
-            if( cpName != NULL )
-            {
-                if( getUconvObject( cpName, &uconvObject, uconvType ) == 0 )
-                {
-                    char uniName[( FACESIZE + 1 ) * 2 ] = { 0, };
-                    int len;
-
-                    len = min( FACESIZE * 2, string_len );
-
-                    for( j = 0; j * 2 < len; j++ )
-                    {
-                        uniName[ j * 2 ] = string[ j * 2 + 1 ];
-                        uniName[ j * 2 + 1 ] = string[ j * 2 ];
-                    }
-
-
-                    rc = UniStrFromUcs( uconvObject, name_buffer, ( UniChar * )uniName, FACESIZE + 2 );
-                    if( rc == ULS_SUCCESS )
-                        return name_buffer;
-                }
-            }
+            if( uniDBCSName )
+                return uniDBCSName;
          }
       }
    }
@@ -3775,8 +3804,6 @@ static  char*  LookupName(TT_Face face,  int index )
              ( encoding == TT_MS_ID_SJIS ))
           {
              /* it's a DBCS string, copy everything except NULLs */
-             int i,j;
-
              for (i=0, j=0; ( i<string_len ) && ( j < FACESIZE - 1 ); i++)
                if (string[i] != '\0')
                   name_buffer[j++] = string[i];
@@ -3804,6 +3831,29 @@ static  char*  LookupName(TT_Face face,  int index )
         }
       }
    }
+
+#ifdef USE_UCONV
+   // maybe there is no default(english) name, find a first match name
+   for ( i = 0; i < n; i++ )
+   {
+      TT_Get_Name_ID( face, i, &platform, &encoding, &language, &id );
+      TT_Get_Name_String( face, i, &string, &string_len );
+
+      if ( id == index )
+      {
+         /* Try to find an appropriate name */
+         if ( platform == TT_PLATFORM_MICROSOFT && encoding == TT_MS_ID_UNICODE_CS )
+         {
+            char *uniDBCSName;
+
+            uniDBCSName = GetUniDBCSName( language, 0, string, string_len );
+
+            if( uniDBCSName )
+                return uniDBCSName;
+         }
+      }
+   }
+#endif
 
    /* Not found */
    return NULL;
