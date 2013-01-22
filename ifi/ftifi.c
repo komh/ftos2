@@ -3,13 +3,13 @@
 /*                                                                         */
 /*             OS/2 Font Driver using the FreeType library                 */
 /*                                                                         */
-/*       Copyright (C) 2002--2005 KO Myung-Hun <komh@chollian.net>         */
+/*       Copyright (C) 2002--2007 KO Myung-Hun <komh@chollian.net>         */
 /*       Copyright (C) 2003--2004 Seo, Hyun-Tae <acrab001@hitel.net>       */
 /*       Copyright (C) 1997--2000 Michal Necasek <mike@mendelu.cz>         */
 /*       Copyright (C) 1997, 1998 David Turner <dturner@cybercable.fr>     */
 /*       Copyright (C) 1997, 1999 International Business Machines          */
 /*                                                                         */
-/*       Version: 1.2.00                                                   */
+/*       Version: 1.2.1                                                    */
 /*                                                                         */
 /* This source is to be compiled with IBM VisualAge C++ 3.0.               */
 /* Other compilers may actually work too but don't forget this is NOT a    */
@@ -107,18 +107,6 @@
 #include "ftxwidth.h"       /* glyph width extension  */
 #include "ftifi.h"          /* xlate table            */
 
-
-/* For the sake of Netscape's text rendering bugs ! */
-#define NETSCAPE_FIX
-
-/* Create font name aliases, such as Roman face for Times New            */
-/* Roman (to mimic PMATM's behaviour)                                    */
-#define FACENAME_ALIAS
-
-//#undef FAKE_BOLD
-
-#define ADD_UNICODE_ENCODING
-
 /* to determine DBCS font face */
 #define AT_LEAST_DBCS_GLYPH     3072
 
@@ -172,7 +160,7 @@ FDHEADER   fdhdr =
 
 /****************************************************************************/
 /* some debug macros and functions. the debug version logs system requests  */
-/* to the file C:\FTIFI.LOG                                                 */
+/* to the file \FTIFI.LOG                                                   */
 /*                                                                          */
 #ifdef DEBUG
   HFILE LogHandle = NULLHANDLE;
@@ -390,33 +378,24 @@ struct _TFontFile
 /*       faces. It's possible, but sounds unlikely.                  */
 #define FL_FLAG_DBCS_FILE        128
 
-#ifdef ADD_UNICODE_ENCODING
-#define FL_FLAG_UNICODE_FILE     256
-#endif
-
 /* Note, we'll only keep the first max_open_files files with opened */
 /* FreeType objects/instances..                                     */
 int  max_open_files = 10;
 
 /* flag for fixing rendering bugs of Netscape */
-#ifdef NETSCAPE_FIX
-static BOOL fNetscapeFix = TRUE;
-#endif
+static BOOL fNetscapeFix = FALSE;
 
 /* flag for using fake TNR font */
-#ifdef FACENAME_ALIAS
-static BOOL fUseFacenameAlias = TRUE;
-#endif
+static BOOL fUseFacenameAlias = FALSE;
 
 /* flag for using fake Bold for DBCS fonts */
-#ifdef FAKE_BOLD
-static BOOL fUseFakeBold = TRUE;
-#endif
+static BOOL fUseFakeBold = FALSE;
 
-/* flag for additional unicode encoding */
-#ifdef ADD_UNICODE_ENCODING
-static BOOL fAddUnicodeEncoding = TRUE;
-#endif
+/* flag for unicode encoding */
+static BOOL fUseUnicodeEncoding = FALSE;
+
+/* instance dpi */
+static int instance_dpi = 72;
 
 /* number of processes using the font driver; used by the init/term */
 /* routine                                                          */
@@ -445,12 +424,7 @@ struct _TFontSize
    TT_Instance   instance;      /* handle to FreeType instance              */
    BOOL          transformed;   /* TRUE = rotation/shearing used (rare)     */
    BOOL          vertical;      /* TRUE = vertically rendered DBCS face     */
-#ifdef  FAKE_BOLD
    BOOL          fakebold;      /* TRUE = fake bold DBCS face               */
-#endif
-#ifdef ADD_UNICODE_ENCODING
-   BOOL          unicode;       /* TRUE = use unicode encoding              */
-#endif
    TT_Matrix     matrix;        /* transformation matrix                    */
    PFontFile     file;          /* HFF this context belongs to              */
    ULONG         faceIndex;     /* index of face in a font (for TTCs)       */
@@ -807,11 +781,6 @@ static  int  Wake_FontFile( PFontFile  cur_file )
   if (!(cur_file->flags & FL_FLAG_ALREADY_USED)) {
      cur_face->charMode  = encoding >> 16;  /* Unicode, Symbol, ... */
      cur_face->em_size   = props.header->Units_Per_EM;
-
-#ifdef ADD_UNICODE_ENCODING
-     if( fAddUnicodeEncoding && cur_face->charMode == TRANSLATE_UGL )
-        cur_file->flags |= FL_FLAG_UNICODE_FILE;
-#endif
 
      /* if a face contains over 1024 glyphs, assume it's a DBCS font - */
      /* VERY probable                                                  */
@@ -1764,7 +1733,6 @@ char *mystrrchr(char *s, char c) {
       return s + lastfound;
 }
 
-#ifdef  FAKE_BOLD
 /****************************************************************************/
 /*                                                                          */
 /* getFakeBoldMetrics :                                                     */
@@ -1849,7 +1817,6 @@ TT_Error buildFakeBoldBitmap( PVOID bitmap,
 
    return TT_Err_Ok;
 }
-#endif
 
 /* -------------------------------------------------------------------------*/
 /* here begin the exported functions                                        */
@@ -2001,13 +1968,7 @@ LONG _System QueryFaces( HFF          hff,
           TT_OS2               *pOS2;
           TT_Postscript        *ppost;
           PIFIMETRICS          pifi2;
-#ifdef  FAKE_BOLD
           PIFIMETRICS          pifi3;
-#endif
-
-#ifdef ADD_UNICODE_ENCODING
-          PIFIMETRICS          pifiUni;
-#endif
 
           PFontFile            file;
           LONG                 index, faceIndex, ifiCount = 0;
@@ -2028,7 +1989,6 @@ LONG _System QueryFaces( HFF          hff,
    if (cMetricLen == 0) {   /* only number of faces is requested */
       LONG rc = file->numFaces;
 
-      #ifdef  FACENAME_ALIAS
       if( fUseFacenameAlias )
       {
         /* create an alias for Times New Roman */
@@ -2039,21 +1999,13 @@ LONG _System QueryFaces( HFF          hff,
             rc *= 2;
         }
       }
-      #endif
       if (file->flags & FL_FLAG_DBCS_FILE)
       {
-#ifdef  FAKE_BOLD
          if( fUseFakeBold )
             rc *= 3;
          else
-#endif
          rc *= 2;
       }
-
-#ifdef ADD_UNICODE_ENCODING
-      if( fAddUnicodeEncoding && ( file->flags & FL_FLAG_UNICODE_FILE ))
-        rc *= 2;
-#endif
 
       return rc;
    }
@@ -2098,18 +2050,34 @@ LONG _System QueryFaces( HFF          hff,
       /* then do not translate from UGL to Unicode and use straight Unicode.  */
       /* But first check if it's a DBCS font and handle it properly           */
       /* Note: here too we use a limit higher than 3072                       */
+      if( fUseUnicodeEncoding && ( pface->charMode == TRANSLATE_UGL ))
+         pface->charMode = TRANSLATE_UNICODE;
+      else
       if ((pface->charMode == TRANSLATE_UGL) && (properties.num_Glyphs > AT_LEAST_DBCS_GLYPH))
       {
-
          LONG  specEnc = PSEID_UNICODE;
          BOOL  UDCflag = FALSE;   /* !!!!TODO: UDC support */
 
-         if( iLangId == TT_MS_LANGID_KOREAN_EXTENDED_WANSUNG_KOREA )
-         {
-            if( TT_Char_Index( pface->charMap, 0xAC00 ) != 0 )
-               specEnc = PSEID_WANSUNG;
-         }
-         else specEnc = interfaceSEId(pface->face, UDCflag, PSEID_UNICODE);
+#if 0
+         iLangId = TT_MS_LANGID_CHINESE_TAIWAN;
+         iLangId = TT_MS_LANGID_CHINESE_PRC;
+#endif
+
+         if(( iLangId == TT_MS_LANGID_KOREAN_EXTENDED_WANSUNG_KOREA ) &&
+            ( TT_Char_Index( pface->charMap, 0xAC00 ) != 0 ))
+            specEnc = PSEID_WANSUNG;
+         else if(( iLangId == TT_MS_LANGID_JAPANESE_JAPAN ) &&
+                 ( TT_Char_Index( pface->charMap, 0x30FB ) != 0 ))
+            specEnc = PSEID_SHIFTJIS;
+         else if(( iLangId == TT_MS_LANGID_CHINESE_TAIWAN ) &&
+                 ( TT_Char_Index( pface->charMap, 0x3105 ) != 0 ))
+            specEnc = PSEID_BIG5;
+         else if(( iLangId == TT_MS_LANGID_CHINESE_PRC ) &&
+                 ( TT_Char_Index( pface->charMap, 0x3105 ) != 0 ))
+            specEnc = PSEID_PRC;
+         else
+            specEnc = interfaceSEId(pface->face, UDCflag, PSEID_UNICODE);
+
          COPY("specEnc = "); CATI( specEnc ); CAT("\r\n"); WRITE;
          switch (specEnc) {
             case PSEID_SHIFTJIS:
@@ -2256,7 +2224,9 @@ LONG _System QueryFaces( HFF          hff,
       switch (pface->charMode) {      /* adjustments for var. encodings */
          case TRANSLATE_UNICODE:
             ifi.giLastChar = pOS2->usLastCharIndex;
-            ifi.fsType |= IFIMETRICS_MBCS | IFIMETRICS_DBCS;
+            ifi.fsType |= IFIMETRICS_UNICODE;
+            if( file->flags & FL_FLAG_DBCS_FILE )
+                ifi.fsType |= IFIMETRICS_MBCS | IFIMETRICS_DBCS;
             break;
 
          case TRANSLATE_SYMBOL:
@@ -2305,22 +2275,13 @@ LONG _System QueryFaces( HFF          hff,
       /* also handle the 'fake' vertically rendered DBCS fonts   */
       if( file->flags & FL_FLAG_DBCS_FILE )
       {
-#ifdef  FAKE_BOLD
         if( fUseFakeBold )
             index *= 3;
         else
-#endif
             index *= 2;
       }
-#ifdef FACENAME_ALIAS
       else if( fUseFacenameAlias && ( file->flags & FL_FLAG_FACENAME_ALIAS ))
         index *= 2;
-#endif
-
-#ifdef ADD_UNICODE_ENCODING
-      if( fAddUnicodeEncoding && file->flags & FL_FLAG_UNICODE_FILE )
-        index *= 2;
-#endif
 
       if ((index >= cStart) && (index < (cStart + cFontCount))) {
          memcpy((((PBYTE) pifiMetrics) + ifiCount), &ifi,
@@ -2346,7 +2307,6 @@ LONG _System QueryFaces( HFF          hff,
           }
           index++;
 
-#ifdef  FAKE_BOLD
         if( fUseFakeBold )
         {
           /* handle the 'fake' bold faced DBCS fonts  */
@@ -2370,11 +2330,8 @@ LONG _System QueryFaces( HFF          hff,
 #endif
              ifiCount += cMetricLen;
           }
-          index++;
         }
-#endif
       }
-      #ifdef  FACENAME_ALIAS
       else if( fUseFacenameAlias && ( file->flags & FL_FLAG_FACENAME_ALIAS ))
       {
          if ((index >= cStart) &&
@@ -2399,136 +2356,7 @@ LONG _System QueryFaces( HFF          hff,
             }
             ifiCount += cMetricLen;
          }
-
-         index++;
       }
-      #endif
-
-#ifdef ADD_UNICODE_ENCODING
-      if( fAddUnicodeEncoding && file->flags & FL_FLAG_UNICODE_FILE )
-      {
-        if( file->flags & FL_FLAG_DBCS_FILE )
-        {
-            if ((index >= cStart) &&
-                (index < (cStart + cFontCount))) {
-               pifiUni = (PIFIMETRICS) (((PBYTE) pifiMetrics) + ifiCount);
-               memcpy(pifiUni, &ifi,
-                      sizeof(IFIMETRICS) > cMetricLen ? cMetricLen : sizeof(IFIMETRICS));
-               memmove( &pifiUni->szFamilyname[ 1 ], pifiUni->szFamilyname, FACESIZE - 1 );
-               pifiUni->szFamilyname[ 0 ] = '&';
-               pifiUni->szFamilyname[ FACESIZE - 1 ] = '\0';
-               memmove( &pifiUni->szFacename[ 1 ], pifiUni->szFacename, FACESIZE - 1 );
-               pifiUni->szFacename[ 0 ] = '&';
-               pifiUni->szFacename[ FACESIZE - 1 ] = '\0';
-               strcpy( pifiUni->szGlyphlistName, "UNICODE" );
-               pifiUni->giLastChar = pOS2->usLastCharIndex;
-               pifiUni->fsType |= IFIMETRICS_MBCS | IFIMETRICS_DBCS;
-               ifiCount += cMetricLen;
-            }
-            index++;
-
-            if ((index >= cStart) &&
-                (index < (cStart + cFontCount))) {
-
-               pifiUni = (PIFIMETRICS) (((PBYTE) pifiMetrics) + ifiCount);
-               memcpy(pifiUni, &ifi,
-                      sizeof(IFIMETRICS) > cMetricLen ? cMetricLen : sizeof(IFIMETRICS));
-               memmove( &pifiUni->szFamilyname[ 2 ], pifiUni->szFamilyname, FACESIZE - 2 );
-               pifiUni->szFamilyname[ 0 ] = '@';
-               pifiUni->szFamilyname[ 1 ] = '&';
-               pifiUni->szFamilyname[ FACESIZE - 1 ] = '\0';
-               memmove( &pifiUni->szFacename[ 2 ], pifiUni->szFacename, FACESIZE - 2 );
-               pifiUni->szFacename[ 0 ] = '@';
-               pifiUni->szFacename[ 1 ] = '&';
-               pifiUni->szFacename[ FACESIZE - 1 ] = '\0';
-               strcpy( pifiUni->szGlyphlistName, "UNICODE" );
-               pifiUni->giLastChar = pOS2->usLastCharIndex;
-               pifiUni->fsType |= IFIMETRICS_MBCS | IFIMETRICS_DBCS;
-               ifiCount += cMetricLen;
-            }
-            index++;
-
-    #ifdef FAKE_BOLD
-          if( fUseFakeBold )
-          {
-            if ((index >= cStart) &&
-                (index < (cStart + cFontCount))) {
-
-               pifiUni = (PIFIMETRICS) (((PBYTE) pifiMetrics) + ifiCount);
-               memcpy(pifiUni, &ifi,
-                      sizeof(IFIMETRICS) > cMetricLen ? cMetricLen : sizeof(IFIMETRICS));
-               memmove( &pifiUni->szFamilyname[ 1 ], pifiUni->szFamilyname, FACESIZE - 1 );
-               pifiUni->szFamilyname[ 0 ] = '&';
-               pifiUni->szFamilyname[ FACESIZE - 1 ] = '\0';
-               memmove( &pifiUni->szFacename[ 1 ], pifiUni->szFacename, FACESIZE - 1 );
-               pifiUni->szFacename[ 0 ] = '&';
-               pifiUni->szFacename[ FACESIZE - 1 ] = '\0';
-               strncat(pifiUni->szFacename, " Bold", FACESIZE - strlen( pifiUni->szFacename ) - 1);
-               pifiUni->usWeightClass = 7;
-               strcpy( pifiUni->szGlyphlistName, "UNICODE" );
-               pifiUni->giLastChar = pOS2->usLastCharIndex;
-               pifiUni->fsType |= IFIMETRICS_MBCS | IFIMETRICS_DBCS;
-               ifiCount += cMetricLen;
-            }
-            index++;
-          }
-    #endif
-        }
-        else
-        {
-            if ((index >= cStart) &&
-                (index < (cStart + cFontCount))) {
-                pifiUni = (PIFIMETRICS) (((PBYTE) pifiMetrics) + ifiCount);
-                memcpy(pifiUni, &ifi,
-                    sizeof(IFIMETRICS) > cMetricLen ? cMetricLen : sizeof(IFIMETRICS));
-                memmove( &pifiUni->szFamilyname[ 1 ], pifiUni->szFamilyname, FACESIZE - 1 );
-                pifiUni->szFamilyname[ 0 ] = '&';
-                pifiUni->szFamilyname[ FACESIZE - 1 ] = '\0';
-                memmove( &pifiUni->szFacename[ 1 ], pifiUni->szFacename, FACESIZE - 1 );
-                pifiUni->szFacename[ 0 ] = '&';
-                pifiUni->szFacename[ FACESIZE - 1 ] = '\0';
-                strcpy( pifiUni->szGlyphlistName, "UNICODE" );
-                pifiUni->giLastChar = pOS2->usLastCharIndex;
-                pifiUni->fsType |= IFIMETRICS_MBCS | IFIMETRICS_DBCS;
-                ifiCount += cMetricLen;
-            }
-            index++;
-
-    #ifdef FACENAME_ALIAS
-            if ( fUseFacenameAlias && ( file->flags & FL_FLAG_FACENAME_ALIAS))
-            {
-              if ((index >= cStart) &&
-                 (index < (cStart + cFontCount))) {
-                 pifiUni = (PIFIMETRICS) (((PBYTE) pifiMetrics) + ifiCount);
-                 memcpy(pifiUni, &ifi,
-                        sizeof(IFIMETRICS) > cMetricLen ? cMetricLen : sizeof(IFIMETRICS));
-                 strcpy(pifiUni->szFamilyname, "Roman");
-                 switch (strlen(ifi.szFacename)) {  /* This looks weird but... works */
-                    case 15: /* Times New Roman */
-                       strcpy(pifiUni->szFacename, "&Tms Rmn");
-                       break;
-                    case 20: /* Times New Roman Bold*/
-                       strcpy(pifiUni->szFacename, "&Tms Rmn Bold");
-                       break;
-                    case 22: /* Times New Roman Italic*/
-                       strcpy(pifiUni->szFacename, "&Tms Rmn Italic");
-                       break;
-                    case 27: /* Times New Roman Bold Italic*/
-                       strcpy(pifiUni->szFacename, "&Tms Rmn Bold Italic");
-                       break;
-                 }
-                 strcpy( pifiUni->szGlyphlistName, "UNICODE" );
-                 pifiUni->giLastChar = pOS2->usLastCharIndex;
-                 pifiUni->fsType |= IFIMETRICS_MBCS | IFIMETRICS_DBCS;
-                 ifiCount += cMetricLen;
-              }
-              index++;
-            }
-    #endif
-        }
-      }
-#endif
-
    }
 
 Exit:
@@ -2565,26 +2393,17 @@ HFC _System OpenFontContext( HFF    hff,
    /* calculate real face index in font file */
    if( file->flags & FL_FLAG_DBCS_FILE )
    {
-#ifdef  FAKE_BOLD
         if( fUseFakeBold )
             faceIndex = ulFont / 3;
         else
-#endif
         faceIndex = ulFont / 2;
    }
    else
         faceIndex = ulFont;
 
-#ifdef ADD_UNICODE_ENCODING
-   if( fAddUnicodeEncoding && file->flags & FL_FLAG_UNICODE_FILE )
-    faceIndex /= 2;
-#endif
-
-   #ifdef  FACENAME_ALIAS
    if ( fUseFacenameAlias && ( file->flags & FL_FLAG_FACENAME_ALIAS ))
       /* This font isn't real! */
-      faceIndex = 0;
-   #endif
+      faceIndex = ulFont / 2;
 
    if (faceIndex >= file->numFaces)
       ERRRET((HFC)-1)
@@ -2594,8 +2413,8 @@ HFC _System OpenFontContext( HFF    hff,
    if (error)
      ERET1( Fail );
 
-   /* Instance resolution is set to 72 dpi and is never changed     */
-   error = TT_Set_Instance_Resolutions(instance, 72, 72);
+   /* Instance resolution is set and is never changed     */
+   error = TT_Set_Instance_Resolutions(instance, instance_dpi, instance_dpi);
    if (error)
       ERRRET((HFC)-1)
 
@@ -2613,7 +2432,6 @@ HFC _System OpenFontContext( HFF    hff,
    contexts[i].file         = file;
    contexts[i].faceIndex    = faceIndex;
 
-#ifdef  FAKE_BOLD
 if( fUseFakeBold )
 {
    /* for DBCS fonts/collections, odd indices are vertical versions*/
@@ -2629,46 +2447,11 @@ if( fUseFakeBold )
       contexts[i].fakebold  = FALSE;
 }
 else
-#endif
    /* for DBCS fonts/collections, odd indices are vertical versions*/
    if ((file->flags & FL_FLAG_DBCS_FILE) && (ulFont & 1))
       contexts[i].vertical  = TRUE;
    else
       contexts[i].vertical  = FALSE;
-
-#ifdef ADD_UNICODE_ENCODING
-   contexts[ i ].unicode = FALSE;
-
-if( fAddUnicodeEncoding && file->flags & FL_FLAG_UNICODE_FILE )
-{
-    if( file->flags & FL_FLAG_DBCS_FILE )
-    {
-        #ifdef FAKE_BOLD
-        if( fUseFakeBold )
-        {
-           if ((ulFont % 6 ) > 2 )
-              contexts[i].unicode  = TRUE;
-        }
-        else
-        #endif
-           if ((ulFont % 4 ) > 1 )
-              contexts[i].unicode  = TRUE;
-    }
-    else
-    {
-        #ifdef FACENAME_ALIAS
-            if( fUseFacenameAlias && ( file->flags & FL_FLAG_FACENAME_ALIAS ))
-            {
-              if ((ulFont % 4 ) > 1 )
-                 contexts[i].unicode  = TRUE;
-            }
-            else
-        #endif
-            if ((ulFont % 2) == 1)
-                contexts[i].unicode  = TRUE;
-    }
-}
-#endif
 
    file->flags |= FL_FLAG_CONTEXT_OPEN;         /* flag as in-use */
 
@@ -2810,26 +2593,6 @@ LONG _System CloseFontContext( HFC hfc)
 /* TOODO: review for Aurora */
 #define MAX_KERN_INDEX  504
 
-#ifdef ADD_UNICODE_ENCODING
-GLYPH ReverseTranslate(PFontFace face, USHORT index, BOOL unicode) {
-   ULONG  i;
-   GLYPH  newidx = 0;
-
-   /* TODO: enable larger fonts */
-   for (i = 0; i < MAX_KERN_INDEX; i++) {
-      COPY("PM2TT Called by 'ReverseTranslate'\r\n"); WRITE;
-      newidx = PM2TT(face->charMap,
-                     unicode ? TRANSLATE_UNICODE : face->charMode,
-                     i);
-      if (newidx == index)
-         break;
-   }
-   if (i < MAX_KERN_INDEX)
-      return i;
-   else
-      return 0;
-}
-#else
 GLYPH ReverseTranslate(PFontFace face, USHORT index) {
    ULONG  i;
    GLYPH  newidx = 0;
@@ -2848,7 +2611,6 @@ GLYPH ReverseTranslate(PFontFace face, USHORT index) {
    else
       return 0;
 }
-#endif
 
 /****************************************************************************/
 /*                                                                          */
@@ -2923,19 +2685,11 @@ LONG _System QueryFaceAttr( HFC     hfc,
       {
          idx = kerntab.pairs[i].left;
          if (kernIndices[idx] == (USHORT)-1)
-#ifdef ADD_UNICODE_ENCODING
-            kernIndices[idx] = ReverseTranslate(face, idx, size->unicode);
-#else
             kernIndices[idx] = ReverseTranslate(face, idx);
-#endif
          kpair->giFirst  = kernIndices[idx];
          idx = kerntab.pairs[i].right;
          if (kernIndices[idx] == (USHORT)-1)
-#ifdef ADD_UNICODE_ENCODING
-            kernIndices[idx] = ReverseTranslate(face, idx, size->unicode);
-#else
             kernIndices[idx] = ReverseTranslate(face, idx);
-#endif
          kpair->giSecond = kernIndices[idx];
          kpair->eKerningAmount = kerntab.pairs[i].value;
          kpair++;
@@ -2976,15 +2730,9 @@ LONG _System QueryFaceAttr( HFC     hfc,
 
          COPY("PM2TT Called by 'QueryFaceAttr'\r\n"); WRITE;
 
-#ifdef ADD_UNICODE_ENCODING
-         index = PM2TT( face->charMap,
-                        size->unicode ? TRANSLATE_UNICODE : face->charMode,
-                        i );
-#else
          index = PM2TT( face->charMap,
                         face->charMode,
                         i );
-#endif
 
          /* get advances and bearings */
          if (size->vertical && properties.vertical && 0) /* TODO: enable */
@@ -3036,7 +2784,6 @@ LONG _System QueryFaceAttr( HFC     hfc,
             }
          }
 
-#ifdef  FAKE_BOLD
          if ( fUseFakeBold && size->fakebold)
          {
             TT_Pos addwid = getFakeBoldMetrics( wid, heights[0], NULL);
@@ -3044,7 +2791,6 @@ LONG _System QueryFaceAttr( HFC     hfc,
             adv_widths[ 0 ] += addwid;
             wid += addwid;
          }
-#endif
 
          if (size->vertical && !is_HALFCHAR(i))
          {
@@ -3065,16 +2811,14 @@ LONG _System QueryFaceAttr( HFC     hfc,
          else
          {
 #if 1
-           if( !is_HALFCHAR( i ))
-              pt->lA = 0;   // workaround for a SBIT font clipping problem.
-           else
-#endif
+           pt->lA = 0;   // workaround for a SBIT font clipping problem.
+#else
            pt->lA = lefts[ 0 ];
+#endif
            pt->ulB = wid;
            pt->lC = adv_widths[0] - pt->lA - pt->ulB;
          }
 
-#ifdef NETSCAPE_FIX
          if ( fNetscapeFix && face->charMode != TRANSLATE_SYMBOL &&
              !size->vertical) {
             if (face->flags & FC_FLAG_FIXED_WIDTH) {
@@ -3088,7 +2832,7 @@ LONG _System QueryFaceAttr( HFC     hfc,
                pt->lC  = lefts[0];
             }
          }
-#endif
+
          COPY("ABC info : index = "); CATI( index );
          CAT("\r\n");
          WRITE;
@@ -3155,9 +2899,7 @@ LONG _System QueryCharAttr( HFC             hfc,
    BOOL       sbitok;
    TT_Pos     ExtentX, ExtentY, addedwidth;
 
-#ifdef  FAKE_BOLD
    static   TT_Raster_Map  fbbmm;
-#endif
 
    #ifdef  DEBUG
    int        row, col;
@@ -3173,11 +2915,7 @@ LONG _System QueryCharAttr( HFC             hfc,
    face = &(size->file->faces[size->faceIndex]);
 
    COPY("PM2TT Called by 'QueryCharAttr'\r\n"); WRITE;
-#ifdef ADD_UNICODE_ENCODING
-   gindex = PM2TT( face->charMap, size->unicode ? TRANSLATE_UNICODE : face->charMode, pCharAttr->gi);
-#else
    gindex = PM2TT( face->charMap, face->charMode, pCharAttr->gi);
-#endif
 
    error = TT_Load_Glyph( size->instance,
                           face->glyph,
@@ -3316,7 +3054,6 @@ LONG _System QueryCharAttr( HFC             hfc,
          pbmm->pfxOrigin.y   = bbox.yMax << 10;
       }
 
-#ifdef  FAKE_BOLD
     if( fUseFakeBold )
     {
       addedwidth = (size->fakebold) ? getFakeBoldMetrics(ExtentX, ExtentY, &fbbmm) : 0;
@@ -3324,7 +3061,6 @@ LONG _System QueryCharAttr( HFC             hfc,
       pbmm->sizlExtent.cx = (ExtentX + addedwidth) >> 6;
     }
     else
-#endif
       pbmm->sizlExtent.cx = ExtentX >> 6;
 
       pbmm->sizlExtent.cy = ExtentY >> 6;
@@ -3349,10 +3085,8 @@ LONG _System QueryCharAttr( HFC             hfc,
       COPY ( "  pCharAttr->cbLen = " ); CATI( pCharAttr->cbLen ); CAT( "\n" ); WRITE;
 
       mapsize = (sbitok) ? image.map.size : bitmap.size;
-#ifdef  FAKE_BOLD
       if ( fUseFakeBold && size->fakebold )
          mapsize = fbbmm.size;
-#endif
 
       if (pCharAttr->cbLen == 0)
          return  mapsize;
@@ -3399,7 +3133,6 @@ LONG _System QueryCharAttr( HFC             hfc,
             cols  = bitmap.cols;
       }
 
-#ifdef FAKE_BOLD
       if ( fUseFakeBold && size->fakebold ) {
          error = buildFakeBoldBitmap( pCharAttr->pBuffer,
                                       pCharAttr->cbLen,
@@ -3413,7 +3146,6 @@ LONG _System QueryCharAttr( HFC             hfc,
             rows = fbbmm.rows;
             cols = fbbmm.cols;
       }
-#endif
 
       #ifdef  DEBUG   /* print Character Image */
          pBitmap = (char*)pCharAttr->pBuffer;
@@ -3471,22 +3203,17 @@ static  void LimitsInit(void) {
    if (max_open_files < 8)   /* ensure limit isn't too low */
       max_open_files = 8;
 
-#ifdef NETSCAPE_FIX
-    fNetscapeFix = PrfQueryProfileInt( HINI_USERPROFILE, "FreeType/2", "Use_Netscape_Fix", TRUE );
-#endif
+   fNetscapeFix = PrfQueryProfileInt( HINI_USERPROFILE, "FreeType/2", "Use_Netscape_Fix", FALSE );
 
-#ifdef FACENAME_ALIAS
-   fUseFacenameAlias = PrfQueryProfileInt( HINI_USERPROFILE, "FreeType/2", "Use_Facename_Alias", TRUE );
-#endif
+   fUseFacenameAlias = PrfQueryProfileInt( HINI_USERPROFILE, "FreeType/2", "Use_Facename_Alias", FALSE );
 
-#ifdef FAKE_BOLD
-   fUseFakeBold = PrfQueryProfileInt( HINI_USERPROFILE, "FreeType/2", "Use_Fake_Bold", TRUE );
-#endif
+   fUseFakeBold = PrfQueryProfileInt( HINI_USERPROFILE, "FreeType/2", "Use_Fake_Bold", FALSE );
 
-#ifdef ADD_UNICODE_ENCODING
-   fAddUnicodeEncoding = PrfQueryProfileInt( HINI_USERPROFILE, "FreeType/2", "Add_Uni_Encode", TRUE );
-#endif
+   fUseUnicodeEncoding = PrfQueryProfileInt( HINI_USERPROFILE, "FreeType/2", "Use_Unicode_Encoding", FALSE );
 
+   instance_dpi = PrfQueryProfileInt(HINI_USERPROFILE, "FreeType/2", "DPI", 72 );
+   if(( instance_dpi != 72 ) && ( instance_dpi != 96 ) && ( instance_dpi != 120 ))
+      instance_dpi = 72;
 }
 
 
@@ -3607,7 +3334,7 @@ ULONG  FirstInit(void) {
       ULONG Action;
    #endif /* DEBUG */
    #ifdef DEBUG
-      DosOpen("C:\\FTIFI.LOG", &LogHandle, &Action, 0, FILE_NORMAL,
+      DosOpen("\\FTIFI.LOG", &LogHandle, &Action, 0, FILE_NORMAL,
               OPEN_ACTION_CREATE_IF_NEW | OPEN_ACTION_REPLACE_IF_EXISTS,
               OPEN_FLAGS_NO_CACHE | OPEN_FLAGS_WRITE_THROUGH |
               OPEN_FLAGS_SEQUENTIAL | OPEN_SHARE_DENYWRITE | OPEN_ACCESS_WRITEONLY,

@@ -1,7 +1,7 @@
 이 파일은 FreeType/2 OS/2 글꼴 드라이버 소스 코드에 대한 설명 파일입니다.
 Copyright (C) 1997-1998 Michal Necasek (mike@mendelu.cz).
 Copyright (C) 2003--2004 서현태 (acrab001@hitel.net)
-Copyright (C) 2002--2005 고명훈 (komh@chollian.net)
+Copyright (C) 2002--2007 고명훈 (komh@chollian.net)
 
 이 패키지에는 다음과 같은 파일이 있습니다.
 
@@ -9,32 +9,8 @@ Copyright (C) 2002--2005 고명훈 (komh@chollian.net)
 
   read1st.kor    지금 보고 있는 파일
   
-  readme.txt     FreeType/2 영문 설명 파일
-
-  readme.kor     FreeType/2 한글 설명 파일
-
-  FAQ            FreeType/2 사용자 FAQ. 영문
-
   DEVELFAQ       FreeType/2 개발자 FAQ. 영문. 컴파일하기 전에 읽으십시오.
 
-  install.cmd    FreeType/2 설치 스크립트
-  
-  uninstall.cmd  FreeType/2 제거 스크립트
-  
-  query.cmd      글꼴 드라이버의 이름을 확인하는 스크립트 
-
-  limit.cmd      동시에 열리는 글꼴의 수를 확인/지정하는 스크립트
-
-  unienc.cmd     글꼴을 유니코드 Glyph 로 추가할 것인지 확인/지정하는 스크립트
-  
-  falias.cmd     글꼴 이름에 대한 별명을 쓸 것인지 확인/지정하는 스크립트
-
-  fakebold.cmd   가짜 Bold 글꼴을 쓸 것인지 확인/지정하는 스크립트
-  
-  netfix.cmd     넷스케이프에 대한 fix 를 쓸 것인지 확인/지정하는 스크립트
-
-  update.cmd     FreeType/2 업데이트 스크립트
-  
   ifi/           FreeType/2 글꼴 드라이버의 소스 코드
 
 

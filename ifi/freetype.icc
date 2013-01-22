@@ -22,7 +22,6 @@
 ICCR=-O+ -G4
 LNKR=/PACKC /PACKD /M /A:32 /E:2
 # uncomment FAKEBOLD to build a Fake Bold Support version.
-FAKEBOLD=-DFAKE_BOLD
 # uncomment ICCD and LNKD to build a debug version. Note that debug and
 # release version is not mutually exclusive in this case.
 #ICCD=-Ti+ -DDEBUG
@@ -34,7 +33,7 @@ FreeType.dll:       $*.obj $*.def ..\lib\libttf.lib
    ilink /NOE $(LNKD) $(LNKR) $*.obj ..\lib\libttf.lib libconv.lib $*.def
 
 FreeType.obj:       ftifi.c ftifi.h FreeType.icc
-   icc $(ICCD) $(ICCR) $(FAKEBOLD) -C -Sp1 -Ss -Ge- -Rn -FoFreeType -I..\lib -I..\lib\extend -I..\lib\arch\os2 ftifi.c
+   icc $(ICCD) $(ICCR) -C -Sp1 -Ss -Ge- -Rn -FoFreeType -I..\lib -I..\lib\extend -I..\lib\arch\os2 ftifi.c
 
 clean:
   -del FreeType.obj

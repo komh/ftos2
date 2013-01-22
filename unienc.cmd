@@ -5,7 +5,7 @@ call SysLoadFuncs
 Parse Upper Arg a1 a2
 
 app = "FreeType/2"
-key = "Add_Uni_Encode"
+key = "Use_Unicode_Encoding"
 
 if Arg() = 0 then call usage
 

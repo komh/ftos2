@@ -1,9 +1,9 @@
 
                         * * *   FreeType/2   * * *
 
-                      (Version 1.2, 28. February 2005)
+                      (Version 1.2.1, 26. February 2007)
 
- Copyright (C) 2002--2005 KO Myung-Hun <komh@chollian.net>
+ Copyright (C) 2002--2007 KO Myung-Hun <komh@chollian.net>
  Copyright (C) 2003--2004 Seo, Hyun-Tae <acrab001@hitel.net>
  Copyright (C) 1997--2000 Michal Necasek <mike@mendelu.cz>
  Copyright (C) 1997,1998 The FreeType Development Team
@@ -93,9 +93,9 @@ A8: First, you should modify a country code of CONFIG.SYS to your country code.
                   If your language is not supported correctly, you can
                   apply at <mike@mendelu.cz>, <acrab001@hitel.net> or
                   <komh@chollian.net>, and become a Beta tester.
-              - additional unicode font face can be added. In this case,
-                original font face name is preceded by '&'.
-
+              - In case of unicode, you can determine if you use unicode 
+                encoding or codepage encoding.
+                
  Bug/feature: - unharmonious glyph spacing in some applications. This seems
                 to come from OS/2's WYSIWYG glyph placement policy. This
                 is more or less visible depending on the application. We
@@ -113,6 +113,24 @@ A8: First, you should modify a country code of CONFIG.SYS to your country code.
 - Planned features and features under consideration:
    - possibly adding even support for Type 1 fonts, but that depends on
      further FreeType engine development. Looks quite probable now.
+
+- File lists
+
+  - readme.txt     This file
+  - readme.kor     README for Korean
+  - FAQ            User's FAQ
+  - FreeType.dll   Font driver
+  - INSTALL.CMD    Installation script
+  - UNINST.CMD     Uninstallation script
+  - UPDATE.CMD     Update script
+  - QUERY.CMD      Query for font driver script
+  - repmode.exe    Replacement program for lock files
+  - LIMIT.CMD      Script to set the limit of concurrently open typefaces   
+  - falis.cmd      Script to set the flag of using facename alias
+  - netfix.cmd     Script to set the flag of using netscape fix
+  - fakebold.cmd   Script to set the flag of using fake bold for DBCS
+  - unienc.cmd     Script to set the flag of unicode encoding
+  - ftos2src.zip   Source files
 
 And finally, thanks go to:
  - the FreeType team, the makers of FreeType. Without them, my work would be
