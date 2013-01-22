@@ -1,0 +1,72 @@
+This is the source code from the FreeType/2 OS/2 font driver.
+Copyright (C) 1997-1998 Michal Necasek (mike@mendelu.cz).
+Copyright (C) 2003--2004 Seo, Hyun-Tae (acrab001@hitel.net)
+Copyright (C) 2002--2005 KO Myung-Hun (komh@chollian.net)
+
+Here's a description of the files in this package :
+
+  readme.1st     This file
+
+  readme.txt     The FreeType/2 Readme
+
+  readme.kor     The FreeType/2 Readme for Korean
+
+  FAQ            The FreeType/2 user faq
+
+  DEVELFAQ       The FreeType/2 developer faq. Read it before trying to
+                 compile this program
+
+  install.cmd    The FreeType/2 installation script
+  uninstall.cmd  The FreeType/2 uninstallation script
+  query.cmd      A script used to query the name of the current font driver
+
+  limit.cmd      The driver controls the number of font files it keeps
+                 opened at the same time, in order to save system resources
+                 and memory (of course, this _doesn't_ limit the number of
+                 opened fonts in PM, it just saves a _lot_ of memory when
+                 many fonts are installed on your system).
+
+                 This script let you change this limit. It can be useful
+                 if you use font-intensive applications (like DTP) and
+                 want better performance (to the sake of memory).
+
+  unienc.cmd     A script to set the flag of adding unicode glyph list name.
+  falias.cmd     A script to set the flag of using facename alias.
+  fakebold.cmd   A script to set the flag of using fake bold for DBCS.
+  netfix.cmd     A script to set the flag of using netscape fix.
+  update.cmd     The FreeType/2 update script
+  ifi/           Source code of the FreeType/2 font driver proper
+
+
+  lib/           files of FreeType 1.3.1
+
+Here's how to compile the font driver.
+
+0. Read the DEVELFAQ ! Now ! Then make a WPS backup !
+
+1. Compile FreeType library, simply go to "lib" directory,
+   and type :
+
+     nmake -f arch\os2\makefile.icc
+
+2. Compile the font driver. Go to the "ifi" directory, then type
+
+     nmake -f freetype.icc
+
+   You should have created a file called "FreeType.dll". Copy it to
+   your "ftos2" directory..
+
+3. Run the "install.cmd" script, then reboot after closing all
+   applications.
+
+4. When your desktop is back, go to the font palette and try to
+   install some new TrueType fonts. Enjoy the difference :-)
+
+5. You can also compile a small memory usage dumper called "ftmem.c"
+   to know how much memory the driver is using. Simply do
+
+     nmake -f ftmem.icc
+
+   Then launch it. A small window will appear with the current amount
+   of memory allocated by the driver.
+
